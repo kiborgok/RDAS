@@ -8,9 +8,7 @@ provides consistency, caching, filtering, pagination, sorting and auditability.
 
 ## Component diagram
 
-```mermaid
-
-```
+<img width="970" height="1145" alt="architecture_diagram" src="https://github.com/user-attachments/assets/17e3f80a-51cd-4aef-a1cc-4ee5ff04905f" />
 
 ### Text fallback
 
