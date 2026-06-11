@@ -1,0 +1,82 @@
+spring:
+  application:
+    name: rdas
+  cache:
+    type: caffeine
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+  shutdown: graceful
+
+rdas:
+  # Upstream CountryInfo SOAP service
+  soap:
+    endpoint: http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso
+    namespace: http://www.oorsprong.org/websamples.countryinfo
+    connect-timeout-ms: 5000
+    read-timeout-ms: 15000
+  # Reference-data snapshot cache (the dataset rarely changes)
+  cache:
+    refresh-interval: PT6H        # scheduled full refresh every 6 hours
+    initial-load-on-startup: true # warm the cache when the app boots
+    serve-stale-on-failure: true  # keep serving the last good snapshot if a refresh fails
+  # Defensive limits for query parameters
+  query:
+    default-page-size: 20
+    max-page-size: 100
+
+# Resilience4j around the single SOAP integration point
+resilience4j:
+  retry:
+    instances:
+      countryInfoSoap:
+        max-attempts: 3
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - com.ncba.rdas.soap.SoapClientException
+  circuitbreaker:
+    instances:
+      countryInfoSoap:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+      group:
+        # Pod is only "ready" (receives traffic) once the reference-data snapshot
+        # has loaded; liveness stays independent so a transient SOAP outage that
+        # serves stale data does not cause Kubernetes to restart the pod.
+        readiness:
+          include: readinessState,referenceData
+        liveness:
+          include: livenessState
+  health:
+    circuitbreakers:
+      enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    com.ncba.rdas: INFO

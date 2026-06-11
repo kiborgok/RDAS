@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rdas
+  namespace: rdas
+  labels:
+    app.kubernetes.io/name: rdas
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Light edge rate-limit as defence in depth (per-client connection).
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: rdas.internal.loop.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rdas
+                port:
+                  number: 80
